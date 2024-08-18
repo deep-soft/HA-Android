@@ -56,6 +56,9 @@ env:
                  ## arm64, armv7, x86
   PRG_TYPE:     "release"
                  ## release, debug
+  PRG_FULL:     "full"
+  PRG_MIN:      "minimal"
+
 # TitleCase
   uPRG_ARCH:    "Arm64"
   uPRG_TYPE:    "Release"
@@ -132,13 +135,13 @@ jobs:
       shell: bash
       run: |
         #set -x;
-        sed -i 's!storeFile file!// storeFile file!' "app/build.gradle.kts";
+        sed -i 's!storeFile = file!// storeFile = file!' "app/build.gradle.kts";
         sed -i 's!signingConfig !// signingConfig !' "app/build.gradle.kts";
         echo "storeFile ... ";
-        grep -i storeFile "android/OsmAnd/build.gradle" || true;
+        grep -i storeFile "app/build.gradle.kts" || true;
         sleep 2
         echo "signingConfig ... ";
-        grep signingConfig "android/OsmAnd/build.gradle" || true;
+        grep signingConfig "app/build.gradle.kts" || true;
         echo "... done";
 
 # zip release begin
@@ -212,23 +215,28 @@ jobs:
 #      working-directory: ./android
 #      run: mv OsmAnd/build/outputs/apk/nightlyFreeLegacyFat/debug/OsmAnd-nightlyFree-legacy-fat-debug.apk OsmAnd/build/outputs/apk/nightlyFreeLegacyFat/debug/OsmAnd-nightlyFree-legacy-fat-debug-$(git log -n 1 --format='%h').apk
 
-#assembleAndroidFullOpenglArm64Release
-# android/OsmAnd/build/outputs/apk/androidFullOpenglArm64/release/OsmAnd-androidFull-opengl-arm64-release-unsigned.apk
     - name: Copy apk from outputs/
       continue-on-error: true
       shell: bash
       run: |
         #set -x
         mkdir -p ./signed-apk
-        #echo "LIST: " ./app/build/outputs/apk/*
-        #ls -lR ./app/build/outputs/apk/
-        echo "LIST: " ./app/build/outputs/apk/release/
-        ls -l ./app/build/outputs/apk/release/
-        cp ./app/build/outputs/apk/release/*.apk ./signed-apk/
+        
+        echo "LIST: " ./app/${{ env.PRG_MIN }}/release/
+        ls -l ./app/${{ env.PRG_MIN }}/release/
+        cp ./app/${{ env.PRG_MIN }}/release/*.apk ./signed-apk/
+
+        echo "LIST: " ./app/${{ env.PRG_FULL }}/release/
+        ls -l ./app/${{ env.PRG_FULL }}/release/
+        cp ./app/${{ env.PRG_FULL }}/release/*.apk ./signed-apk/
+        
         pushd ./signed-apk/
         echo "LIST: " ./
         ls -l ./
-        mv "${{ env.PRG_NAME }}-${{ env.PRG_ARCH }}-${{ env.PRG_TYPE }}-unsigned.apk" "${{ env.PRG_NAME }}-${{ env.PRG_VERSION }}-${{ env.PRG_ARCH }}-${{ env.TAG_BUILD }}.apk"
+
+        mv "app-${{ env.PRG_MIN  }}-${{ env.PRG_TYPE }}-unsigned.apk" "${{ env.PRG_NAME }}-${{ env.PRG_VERSION }}-${{ env.PRG_ARCH }}-${{ env.TAG_BUILD }}-${{ env.PRG_MIN  }}.apk"
+        mv "app-${{ env.PRG_FULL }}-${{ env.PRG_TYPE }}-unsigned.apk" "${{ env.PRG_NAME }}-${{ env.PRG_VERSION }}-${{ env.PRG_ARCH }}-${{ env.TAG_BUILD }}-${{ env.PRG_FULL }}.apk"
+
         ls -l ./
         popd
 
@@ -236,7 +244,7 @@ jobs:
       continue-on-error: true
       name: Sign app APK
       if: env.ANDROID_SIGNING_KEY != null
-      id: sign-App
+      id: sign_app
       with:
         releaseDirectory: ./signed-apk
         signingKeyBase64: ${{ secrets.ANDROID_SIGNING_KEY }}
@@ -247,15 +255,26 @@ jobs:
       #  # override default build-tools version (29.0.3) -- optional
       #  BUILD_TOOLS_VERSION: "34.0.0"
 
-    - name: SHA256 checksum
+    - name: SHA256 checksum minimal
       continue-on-error: true
       uses: deep-soft/sha-checksums@v1
       with:
         type: 'SHA256'
-        filename: '${{steps.sign-App.outputs.signedReleaseFile}}.sha256'
+        filename: '${{ steps.sign_app.signedReleaseFile0 }}.sha256'
         directory: '.'
-        path: '${{steps.sign-App.outputs.signedReleaseFile}}'
-        env_variable: 'SHA_SUMS'
+        path: '${{ steps.sign_app.signedReleaseFile0 }}'
+        env_variable: 'SHA_SUMS_0'
+        ignore_git: false
+
+    - name: SHA256 checksum full
+      continue-on-error: true
+      uses: deep-soft/sha-checksums@v1
+      with:
+        type: 'SHA256'
+        filename: '${{ steps.sign_app.signedReleaseFile1 }}.sha256'
+        directory: '.'
+        path: '${{ steps.sign_app.signedReleaseFile1 }}'
+        env_variable: 'SHA_SUMS_1'
         ignore_git: false
 
     - name: Publish signed apk package
@@ -266,8 +285,10 @@ jobs:
         # draft: true
         tag_name: ${{ env.TAG_NAME }}
         files: |
-          ${{steps.sign-App.outputs.signedReleaseFile}}
-          ${{steps.sign-App.outputs.signedReleaseFile}}.sha256
+          ${{ steps.sign_app.signedReleaseFile0 }}
+          ${{ steps.sign_app.signedReleaseFile1 }}
+          ${{ steps.sign_app.signedReleaseFile0 }}.sha256
+          ${{ steps.sign_app.signedReleaseFile1 }}.sha256
           _tag_name_.txt
 
     - name: Publish unsigned apk package
@@ -278,7 +299,8 @@ jobs:
         draft: true
         tag_name: ${{ env.TAG_VERSION }}${{ env.TAG_BUILD }}
         files: |
-            app/build/outputs/apk/*/*/*.apk
+            ./app/${{ env.PRG_MIN  }}/release/*.apk
+            ./app/${{ env.PRG_FULL }}/release/*.apk
 
     - name: Archive APK
       if: ${{ inputs.artifact_unsigned }}
@@ -286,7 +308,7 @@ jobs:
       uses: deep-soft/upload-artifact@v4
       with:
         name: release
-        path: app/build/outputs/apk/*/*/*.apk
+        path: ./**/*.apk
         retention-days: 90
 
 # zip release begin
