@@ -2,8 +2,8 @@ name: Production Deploy
 
 on:
   workflow_dispatch:
-  release:
-    types: [ released ]
+#  release:
+#    types: [ released ]
 
 env:
   SUPPLY_UPLOAD_MAX_RETRIES: 5
