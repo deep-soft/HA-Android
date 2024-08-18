@@ -261,9 +261,9 @@ jobs:
       uses: deep-soft/sha-checksums@v1
       with:
         type: 'SHA256'
-        filename: '${{ steps.sign_app.signedReleaseFile0 }}.sha256'
+        filename: '${{ env.SIGNED_RELEASE_FILE_0 }}.sha256'
         directory: '.'
-        path: '${{ steps.sign_app.signedReleaseFile0 }}'
+        path: '${{ env.SIGNED_RELEASE_FILE_0 }}'
         env_variable: 'SHA_SUMS_0'
         ignore_git: false
 
@@ -272,9 +272,9 @@ jobs:
       uses: deep-soft/sha-checksums@v1
       with:
         type: 'SHA256'
-        filename: '${{ steps.sign_app.signedReleaseFile1 }}.sha256'
+        filename: '${{ env.SIGNED_RELEASE_FILE_1 }}.sha256'
         directory: '.'
-        path: '${{ steps.sign_app.signedReleaseFile1 }}'
+        path: '${{ env.SIGNED_RELEASE_FILE_1 }}'
         env_variable: 'SHA_SUMS_1'
         ignore_git: false
 
@@ -286,10 +286,10 @@ jobs:
         # draft: true
         tag_name: ${{ env.TAG_NAME }}
         files: |
-          ${{ steps.sign_app.signedReleaseFile0 }}
-          ${{ steps.sign_app.signedReleaseFile1 }}
-          ${{ steps.sign_app.signedReleaseFile0 }}.sha256
-          ${{ steps.sign_app.signedReleaseFile1 }}.sha256
+          ${{ env.SIGNED_RELEASE_FILE_0 }}
+          ${{ env.SIGNED_RELEASE_FILE_1 }}
+          ${{ env.SHA_SUMS_0 }}
+          ${{ env.SHA_SUMS_1 }}
           _tag_name_.txt
 
     - name: Publish unsigned apk package
@@ -300,8 +300,8 @@ jobs:
         draft: true
         tag_name: ${{ env.TAG_VERSION }}${{ env.TAG_BUILD }}
         files: |
-            ./app/${{ env.PRG_MIN  }}/release/*.apk
-            ./app/${{ env.PRG_FULL }}/release/*.apk
+            ${{ env.FOLDER_OUT }}/${{ env.PRG_MIN  }}/release/*.apk
+            ${{ env.FOLDER_OUT }}/${{ env.PRG_FULL }}/release/*.apk
 
     - name: Archive APK
       if: ${{ inputs.artifact_unsigned }}
