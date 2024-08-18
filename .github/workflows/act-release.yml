@@ -291,16 +291,17 @@ jobs:
 
 # zip release begin
     - name: Create Archive ALL
+      id: zip_archive_all
       if:  ${{ inputs.archive_ALL}}
       continue-on-error: true
-      uses: deep-soft/zip-release@v2
+      uses: deep-soft/zip-release@v3
       with:
-        type: 'zip'
+        type: '7z'
         filename: '${{ env.TAG_VERSION }}${{ env.TAG_BUILD }}-ALL'
         directory: '.'
         path: '.'
         exclusions: '*.git* /*node_modules/* .editorconfig'
-        # archive name is ${{ env.ZIP_ARCHIVE_RELEASE }}
+        env_variable: 'ZIP_ARCHIVE_ALL'
 
     - name: Publish Archive ALL
       if:  ${{ inputs.archive_ALL}}
@@ -309,6 +310,7 @@ jobs:
       with:
         draft: true
         tag_name: ${{ env.TAG_VERSION }}${{ env.TAG_BUILD }}-ALL
+        filelist: ${{ steps.zip_archive_all.outputs.volumes_list_name }}
         files: |
-            ${{ env.ZIP_ARCHIVE_RELEASE }}
+            ${{ env.ZIP_ARCHIVE_ALL }}
 # zip release end
