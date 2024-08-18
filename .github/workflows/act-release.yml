@@ -101,7 +101,6 @@ jobs:
       run: |
         # set -x
         _ref_all_=$(git log -1 --format='%H')
-        popd
         # _ref_=$(echo ${_ref_all_::7})
         _ref_org_=${{ env.TAG_REF }}
         _ref_len_="${#_ref_org_}"
@@ -179,7 +178,8 @@ jobs:
         cache: gradle
 
     - name: Grant execute permission for gradlew
-      working-directory: ./android
+      continue-on-error: true
+      working-directory: ./
       #  ./gradlew clean
       run: |
         chmod +x gradlew
