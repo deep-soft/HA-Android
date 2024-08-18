@@ -1,0 +1,314 @@
+# 2024-08-18 18:00
+# act-release.yml
+#
+name: act-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      gradle_cache:
+        description: 'gradle_cache'
+        type: boolean
+        default: false
+        required: true
+      archive_src:
+        description: 'archive_src'
+        type: boolean
+        default: false
+        required: true
+      archive_ALL:
+        description: 'archive_ALL'
+        type: boolean
+        default: false
+        required: true
+      artifact_unsigned:
+        description: 'artifact_unsigned'
+        type: boolean
+        default: false
+        required: true
+      SED_STUFF:
+        description: SED_STUFF
+        type: boolean
+        default: false
+        required: true
+      SED_STUFF_PARAMS:
+        description: SED_STUFF_PARAMS
+        default: "filename_to_cat"
+        required: true
+      DEBUG_MODE_1:
+        description: DEBUG_MODE_1
+        default: "N"
+        required: true
+      DEBUG_MODE_2:
+        description: DEBUG_MODE_2
+        default: "N"
+        required: true
+
+env:
+  TAG_NAME:     "HAA"
+  TAG_VERSION:  "HAA-v1.0.0"
+  TAG_BUILD:    "-b"
+  TAG_REF:      "0000000"
+  PRG_NAME:     "HAA"
+  PRG_TASK:     "assemble"
+                 ## assemble, bundle
+  PRG_ARCH:     "arm64"
+                 ## arm64, armv7, x86
+  PRG_TYPE:     "release"
+                 ## release, debug
+# TitleCase
+  uPRG_ARCH:    "Arm64"
+  uPRG_TYPE:    "Release"
+# version  
+  PRG_VERSION:  "v1.0.0"
+  VERSION:      "1.0.0"
+# secrets
+  ANDROID_SIGNING_KEY:    '${{ secrets.ANDROID_SIGNING_KEY }}'
+  #  signingKeyBase64:    '${{ secrets.ANDROID_SIGNING_KEY }}'
+  #  alias:               '${{ secrets.ANDROID_ALIAS }}'
+  #  keyStorePassword:    '${{ secrets.ANDROID_KEY_STORE_PASSWORD }}'
+  #  keyPassword:         '${{ secrets.ANDROID_KEY_PASSWORD }}'
+  JAVA_DIST:    "adopt"
+  JAVA_VERS:    "17"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: checkout 
+      uses: deep-soft/checkout@v4
+#      with:
+#        path: android
+
+# temporary fix ?!
+    - name: sed-stuff
+      if: ${{ inputs.SED_STUFF }}
+      continue-on-error: true
+      shell: bash
+      env:
+        DEBUG_MODE_1: ${{ inputs.DEBUG_MODE_1 }}
+        DEBUG_MODE_2: ${{ inputs.DEBUG_MODE_2 }}
+      run: |
+        bash android/bins/sed-stuff.sh "_" "${{ inputs.SED_STUFF_PARAMS }}"
+
+    - name: Get ref, set build version
+      continue-on-error: true
+      shell: bash
+      run: |
+        # set -x
+        _ref_all_=$(git log -1 --format='%H')
+        popd
+        # _ref_=$(echo ${_ref_all_::7})
+        _ref_org_=${{ env.TAG_REF }}
+        _ref_len_="${#_ref_org_}"
+        _ref_=$(echo ${_ref_all_::$_ref_len_})
+        _prg_version_base_="v"$(grep "versionName \"" "app/build.gradle.kts" | cut -d '"' -f2)
+        _prg_version_="$_prg_version_base_"
+        echo "TAG_REF=$_ref_" >> $GITHUB_ENV
+        _crt_date_=$(date "+%Y%m%d_%H%M")
+        _build_="$_crt_date_${{ env.TAG_BUILD }}.$_ref_"
+        echo "TAG_BUILD=$_build_" >> $GITHUB_ENV
+        echo "PRG_VERSION=$_prg_version_" >> $GITHUB_ENV
+        echo "TAG_VERSION=$_prg_version_" >> $GITHUB_ENV
+
+    - name: Print ref, build version
+      shell: bash
+      run: |
+        echo "NAM: ${{ env.PRG_NAME    }}"
+        echo "VER: ${{ env.PRG_VERSION }}"
+        echo "TAG: ${{ env.TAG_VERSION }}"
+        echo "REF: ${{ env.TAG_REF     }}"
+        echo "BLD: ${{ env.TAG_BUILD   }}"
+        echo "ARC: ${{ env.PRG_ARCH    }}"
+        echo "TYP: ${{ env.PRG_TYPE    }}"
+        echo "${{ env.PRG_NAME }}-${{ env.PRG_VERSION }}-${{ env.PRG_FLAVOR }}-${{ env.PRG_OGL }}-${{ env.PRG_ARCH }}-${{ env.PRG_TYPE }}-${{ env.TAG_BUILD }}" > _tag_name_.txt
+
+# signingConfig storeFile
+    - name: skip sign
+      continue-on-error: true
+      shell: bash
+      run: |
+        #set -x;
+        sed -i 's!storeFile file!// storeFile file!' "app/build.gradle.kts";
+        sed -i 's!signingConfig !// signingConfig !' "app/build.gradle.kts";
+        echo "storeFile ... ";
+        grep -i storeFile "android/OsmAnd/build.gradle" || true;
+        sleep 2
+        echo "signingConfig ... ";
+        grep signingConfig "android/OsmAnd/build.gradle" || true;
+        echo "... done";
+
+# zip release begin
+    - name: Create Archive src
+      if:  ${{ inputs.archive_src}}
+      continue-on-error: true
+      uses: deep-soft/zip-release@v2
+      with:
+        type: 'zip'
+        filename: '${{ env.TAG_NAME }}-${{ env.TAG_VERSION }}-src'
+        directory: '.'
+        path: '.'
+        exclusions: '*.git/* /*node_modules/* .editorconfig'
+        env_variable: 'ZIP_ARCHIVE_SRC'
+        # archive name is ${{ env.ZIP_ARCHIVE_RELEASE }}
+
+    - name: Publish Archive src
+      if:  ${{ inputs.archive_src}}
+      continue-on-error: true
+      uses: deep-soft/action-gh-release@v2.1
+      with:
+        draft: true
+        tag_name: '${{ env.TAG_NAME }}-src'
+        files: |
+            ${{ env.ZIP_ARCHIVE_SRC }}
+# zip release end
+
+    - name: Setup java
+      uses: deep-soft/setup-java@v4
+      #  distribution: 'temurin'
+      #  java-version: '17'
+      #  distribution: 'adopt'
+      #  java-version: '11'
+      with:
+        distribution: ${{ env.JAVA_DIST }}
+        java-version: ${{ env.JAVA_VERS }}
+        cache: gradle
+
+    - name: Grant execute permission for gradlew
+      working-directory: ./android
+      #  ./gradlew clean
+      run: |
+        chmod +x gradlew
+
+#    - name: Patch memory requirements
+#      working-directory: ./
+#      #run: printf "\norg.gradle.jvmargs=-Xmx2048m \n" >> gradle.properties
+#      #printf "\norg.gradle.jvmargs=-Xmx2048m -XX:MaxPermSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8\n" >> gradle.properties
+#      run: |
+#        printf "\norg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8\n" >> gradle.properties
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+
+    - name: Mock google-services.json
+      run: |
+        cp .github/mock-google-services.json app/google-services.json
+        cp .github/mock-google-services.json wear/google-services.json
+        cp .github/mock-google-services.json automotive/google-services.json
+
+    - name: Build APK
+      continue-on-error: true
+      run: |
+        ./gradlew :common:${{ env.PRG_TASK }}
+        ./gradlew :app:${{ env.PRG_TASK }}${{ env.uPRG_TYPE  }}
+#        ./gradlew :wear:assembleDebug
+#        ./gradlew :automotive:assembleDebug
+
+#    - name: Rename APK
+#      working-directory: ./android
+#      run: mv OsmAnd/build/outputs/apk/nightlyFreeLegacyFat/debug/OsmAnd-nightlyFree-legacy-fat-debug.apk OsmAnd/build/outputs/apk/nightlyFreeLegacyFat/debug/OsmAnd-nightlyFree-legacy-fat-debug-$(git log -n 1 --format='%h').apk
+
+#assembleAndroidFullOpenglArm64Release
+# android/OsmAnd/build/outputs/apk/androidFullOpenglArm64/release/OsmAnd-androidFull-opengl-arm64-release-unsigned.apk
+    - name: Copy apk from outputs/
+      continue-on-error: true
+      shell: bash
+      run: |
+        #set -x
+        mkdir -p ./signed-apk
+        #echo "LIST: " ./app/build/outputs/apk/*
+        #ls -lR ./app/build/outputs/apk/
+        echo "LIST: " ./app/build/outputs/apk/release/
+        ls -l ./app/build/outputs/apk/release/
+        cp ./app/build/outputs/apk/release/*.apk ./signed-apk/
+        pushd ./signed-apk/
+        echo "LIST: " ./
+        ls -l ./
+        mv "${{ env.PRG_NAME }}-${{ env.PRG_ARCH }}-${{ env.PRG_TYPE }}-unsigned.apk" "${{ env.PRG_NAME }}-${{ env.PRG_VERSION }}-${{ env.PRG_ARCH }}-${{ env.TAG_BUILD }}.apk"
+        ls -l ./
+        popd
+
+    - uses: deep-soft/sign-android-release@v1
+      continue-on-error: true
+      name: Sign app APK
+      if: env.ANDROID_SIGNING_KEY != null
+      id: sign-App
+      with:
+        releaseDirectory: ./signed-apk
+        signingKeyBase64: ${{ secrets.ANDROID_SIGNING_KEY }}
+        alias:            ${{ secrets.ANDROID_ALIAS }}
+        keyStorePassword: ${{ secrets.ANDROID_KEY_STORE_PASSWORD }}
+        keyPassword:      ${{ secrets.ANDROID_KEY_PASSWORD }}
+      #env:
+      #  # override default build-tools version (29.0.3) -- optional
+      #  BUILD_TOOLS_VERSION: "34.0.0"
+
+    - name: SHA256 checksum
+      continue-on-error: true
+      uses: deep-soft/sha-checksums@v1
+      with:
+        type: 'SHA256'
+        filename: '${{steps.sign-App.outputs.signedReleaseFile}}.sha256'
+        directory: '.'
+        path: '${{steps.sign-App.outputs.signedReleaseFile}}'
+        env_variable: 'SHA_SUMS'
+        ignore_git: false
+
+    - name: Publish signed apk package
+      if: env.ANDROID_SIGNING_KEY != null
+      continue-on-error: true
+      uses: deep-soft/action-gh-release@v2.1
+      with:
+        # draft: true
+        tag_name: ${{ env.TAG_NAME }}
+        files: |
+          ${{steps.sign-App.outputs.signedReleaseFile}}
+          ${{steps.sign-App.outputs.signedReleaseFile}}.sha256
+          _tag_name_.txt
+
+    - name: Publish unsigned apk package
+      if: env.ANDROID_SIGNING_KEY == null
+      continue-on-error: true
+      uses: deep-soft/action-gh-release@v2.1
+      with:
+        draft: true
+        tag_name: ${{ env.TAG_VERSION }}${{ env.TAG_BUILD }}
+        files: |
+            app/build/outputs/apk/*/*/*.apk
+
+    - name: Archive APK
+      if: ${{ inputs.artifact_unsigned }}
+      continue-on-error: true
+      uses: deep-soft/upload-artifact@v4
+      with:
+        name: release
+        path: app/build/outputs/apk/*/*/*.apk
+        retention-days: 90
+
+# zip release begin
+    - name: Create Archive ALL
+      if:  ${{ inputs.archive_ALL}}
+      continue-on-error: true
+      uses: deep-soft/zip-release@v2
+      with:
+        type: 'zip'
+        filename: '${{ env.TAG_VERSION }}${{ env.TAG_BUILD }}-ALL'
+        directory: '.'
+        path: '.'
+        exclusions: '*.git* /*node_modules/* .editorconfig'
+        # archive name is ${{ env.ZIP_ARCHIVE_RELEASE }}
+
+    - name: Publish Archive ALL
+      if:  ${{ inputs.archive_ALL}}
+      continue-on-error: true
+      uses: deep-soft/action-gh-release@v2.1
+      with:
+        draft: true
+        tag_name: ${{ env.TAG_VERSION }}${{ env.TAG_BUILD }}-ALL
+        files: |
+            ${{ env.ZIP_ARCHIVE_RELEASE }}
+# zip release end
