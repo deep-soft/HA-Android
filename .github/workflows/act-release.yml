@@ -58,6 +58,7 @@ env:
                  ## release, debug
   PRG_FULL:     "full"
   PRG_MIN:      "minimal"
+  FOLDER_OUT:   "./app/build/outputs/apk"
 
 # TitleCase
   uPRG_ARCH:    "Arm64"
@@ -102,20 +103,20 @@ jobs:
       continue-on-error: true
       shell: bash
       run: |
-        # set -x
-        _ref_all_=$(git log -1 --format='%H')
-        # _ref_=$(echo ${_ref_all_::7})
-        _ref_org_=${{ env.TAG_REF }}
-        _ref_len_="${#_ref_org_}"
-        _ref_=$(echo ${_ref_all_::$_ref_len_})
-        _prg_version_base_="v"$(grep "versionName \"" "app/build.gradle.kts" | cut -d '"' -f2)
-        _prg_version_="$_prg_version_base_"
-        echo "TAG_REF=$_ref_" >> $GITHUB_ENV
-        _crt_date_=$(date "+%Y%m%d_%H%M")
-        _build_="$_crt_date_${{ env.TAG_BUILD }}.$_ref_"
-        echo "TAG_BUILD=$_build_" >> $GITHUB_ENV
-        echo "PRG_VERSION=$_prg_version_" >> $GITHUB_ENV
-        echo "TAG_VERSION=$_prg_version_" >> $GITHUB_ENV
+        # set -x;
+        _ref_all_=$(git log -1 --format='%H');
+        # _ref_=$(echo ${_ref_all_::7});
+        _ref_org_=${{ env.TAG_REF }};
+        _ref_len_="${#_ref_org_}";
+        _ref_=$(echo ${_ref_all_::$_ref_len_});
+        _prg_version_base_="v"$(grep "versionName \"" "app/build.gradle.kts" | cut -d '"' -f2) || true;
+        _prg_version_="$_prg_version_base_";
+        echo "TAG_REF=$_ref_" >> $GITHUB_ENV;
+        _crt_date_=$(date "+%Y%m%d_%H%M");
+        _build_="$_crt_date_${{ env.TAG_BUILD }}.$_ref_";
+        echo "TAG_BUILD=$_build_" >> $GITHUB_ENV;
+        echo "PRG_VERSION=$_prg_version_" >> $GITHUB_ENV;
+        echo "TAG_VERSION=$_prg_version_" >> $GITHUB_ENV;
 
     - name: Print ref, build version
       shell: bash
@@ -222,13 +223,13 @@ jobs:
         #set -x
         mkdir -p ./signed-apk
         
-        echo "LIST: " ./app/${{ env.PRG_MIN }}/release/
-        ls -l ./app/${{ env.PRG_MIN }}/release/
-        cp ./app/${{ env.PRG_MIN }}/release/*.apk ./signed-apk/
+        echo "LIST: " ${{ env.FOLDER_OUT }}/${{ env.PRG_MIN }}/release/
+        ls -l ${{ env.FOLDER_OUT }}/${{ env.PRG_MIN }}/release/
+        cp ${{ env.FOLDER_OUT }}/${{ env.PRG_MIN }}/release/*.apk ./signed-apk/
 
-        echo "LIST: " ./app/${{ env.PRG_FULL }}/release/
-        ls -l ./app/${{ env.PRG_FULL }}/release/
-        cp ./app/${{ env.PRG_FULL }}/release/*.apk ./signed-apk/
+        echo "LIST: " ${{ env.FOLDER_OUT }}/${{ env.PRG_FULL }}/release/
+        ls -l ${{ env.FOLDER_OUT }}/${{ env.PRG_FULL }}/release/
+        cp ${{ env.FOLDER_OUT }}/${{ env.PRG_FULL }}/release/*.apk ./signed-apk/
         
         pushd ./signed-apk/
         echo "LIST: " ./
