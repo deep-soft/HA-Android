@@ -324,6 +324,9 @@
     <string name="interval_in_view">In view</string>
     <string name="keep_screen_on_def">Do not lock screen when dashboard is active</string>
     <string name="keep_screen_on">Keep screen on</string>
+    <string name="page_zoom_default">%1$d%% (default)</string>
+    <string name="page_zoom_pct">%1$d%%</string>
+    <string name="page_zoom">Page zoom</string>
     <string name="pinch_to_zoom_def">Allow pinch-to-zoom gesture to zoom app window</string>
     <string name="pinch_to_zoom">Pinch-to-zoom</string>
     <string name="label_attribute">Attribute:</string>
@@ -1274,4 +1277,10 @@
     <string name="state_update_available">Update available</string>
     <string name="state_up_to_date">Up-to-date</string>
     <string name="sensor_name_health_connect">Health Connect sensors</string>
+    <string name="basic_sensor_name_sim_1_signal_strength">Signal strength (SIM 1)</string>
+    <string name="basic_sensor_name_sim_2_signal_strength">Signal strength (SIM 2)</string>
+    <string name="sensor_description_signal_strength">Get the most recently available signal strength information. Due to power saving this information may not always be current.</string>
+    <string name="basic_sensor_name_sim_1_data_network_type">Data network type (SIM 1)</string>
+    <string name="basic_sensor_name_sim_2_data_network_type">Data network type (SIM 2)</string>
+    <string name="sensor_description_data_network_type">The radio technology (network type) currently in use on the device for data transmission</string>
 </resources>
