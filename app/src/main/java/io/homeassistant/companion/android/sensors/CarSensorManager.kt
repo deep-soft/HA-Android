@@ -11,6 +11,7 @@ import androidx.car.app.hardware.info.EnergyProfile
 import androidx.car.app.hardware.info.EvStatus
 import androidx.car.app.hardware.info.Mileage
 import androidx.car.app.hardware.info.Model
+import androidx.car.app.hardware.info.Speed
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import io.homeassistant.companion.android.BuildConfig
@@ -68,6 +69,25 @@ class CarSensorManager :
                 unitOfMeasurement = "%",
                 stateClass = SensorManager.STATE_CLASS_MEASUREMENT,
                 deviceClass = "battery",
+                entityCategory = SensorManager.ENTITY_CATEGORY_DIAGNOSTIC
+            ),
+            autoPermissions = listOf("com.google.android.gms.permission.CAR_FUEL"),
+            automotivePermissions = listOf(
+                "android.car.permission.CAR_ENERGY",
+                "android.car.permission.CAR_ENERGY_PORTS",
+                "android.car.permission.READ_CAR_DISPLAY_UNITS"
+            )
+        )
+        private val rangeRemaining = CarSensor(
+            SensorManager.BasicSensor(
+                "car_range_remaining",
+                "sensor",
+                R.string.basic_sensor_name_car_range_remaining,
+                R.string.sensor_description_car_range_remaining,
+                "mdi:map-marker-distance",
+                unitOfMeasurement = "m",
+                stateClass = SensorManager.STATE_CLASS_MEASUREMENT,
+                deviceClass = "distance",
                 entityCategory = SensorManager.ENTITY_CATEGORY_DIAGNOSTIC
             ),
             autoPermissions = listOf("com.google.android.gms.permission.CAR_FUEL"),
@@ -138,6 +158,20 @@ class CarSensorManager :
             autoPermissions = listOf("com.google.android.gms.permission.CAR_FUEL"),
             automotivePermissions = listOf("android.car.permission.CAR_INFO")
         )
+        private val carSpeed = CarSensor(
+            SensorManager.BasicSensor(
+                "car_speed",
+                "sensor",
+                R.string.basic_sensor_name_car_speed,
+                R.string.sensor_description_car_speed,
+                "mdi:speedometer",
+                unitOfMeasurement = "m/s",
+                deviceClass = "speed",
+                stateClass = SensorManager.STATE_CLASS_MEASUREMENT
+            ),
+            autoPermissions = listOf("com.google.android.gms.permission.CAR_SPEED"),
+            automotivePermissions = listOf("android.car.permission.CAR_SPEED", "android.car.permission.READ_CAR_DISPLAY_UNITS")
+        )
 
         private val allSensorsList = listOf(
             batteryLevel,
@@ -146,7 +180,9 @@ class CarSensorManager :
             evConnector,
             fuelLevel,
             fuelType,
-            odometerValue
+            odometerValue,
+            carSpeed,
+            rangeRemaining
         )
 
         private enum class Listener {
@@ -154,22 +190,25 @@ class CarSensorManager :
             MODEL,
             MILEAGE,
             STATUS,
-            PROFILE
+            PROFILE,
+            SPEED
         }
 
         private val listenerSensors = mapOf(
-            Listener.ENERGY to listOf(batteryLevel, fuelLevel),
+            Listener.ENERGY to listOf(batteryLevel, fuelLevel, rangeRemaining),
             Listener.MODEL to listOf(carName),
             Listener.STATUS to listOf(carChargingStatus),
             Listener.MILEAGE to listOf(odometerValue),
-            Listener.PROFILE to listOf(evConnector, fuelType)
+            Listener.PROFILE to listOf(evConnector, fuelType),
+            Listener.SPEED to listOf(carSpeed)
         )
         private val listenerLastRegistered = mutableMapOf(
             Listener.ENERGY to -1L,
             Listener.MODEL to -1L,
             Listener.STATUS to -1L,
             Listener.MILEAGE to -1L,
-            Listener.PROFILE to -1L
+            Listener.PROFILE to -1L,
+            Listener.SPEED to -1L
         )
     }
 
@@ -336,6 +375,13 @@ class CarSensorManager :
                     car.fetchEnergyProfile(executor, ::onProfileAvailable)
                 }
             }
+            Listener.SPEED -> {
+                if (enable) {
+                    car.addSpeedListener(executor, ::onSpeedAvailable)
+                } else {
+                    car.removeSpeedListener(::onSpeedAvailable)
+                }
+            }
         }
 
         if (enable) {
@@ -384,6 +430,19 @@ class CarSensorManager :
                 batteryLevel.sensor.statelessIcon,
                 mapOf(
                     "status" to batteryStatus
+                ),
+                forceUpdate = true
+            )
+        }
+        val rangeRemainingStatus = carValueStatus(data.rangeRemainingMeters.status)
+        if (isEnabled(latestContext, rangeRemaining)) {
+            onSensorUpdated(
+                latestContext,
+                rangeRemaining.sensor,
+                if (rangeRemainingStatus == "success") data.rangeRemainingMeters.value!! else STATE_UNKNOWN,
+                rangeRemaining.sensor.statelessIcon,
+                mapOf(
+                    "status" to rangeRemainingStatus
                 ),
                 forceUpdate = true
             )
@@ -476,6 +535,24 @@ class CarSensorManager :
                 mapOf(
                     "status" to evConnectorTypeStatus,
                     "options" to evTypeMap.values.toList()
+                ),
+                forceUpdate = true
+            )
+        }
+    }
+
+    private fun onSpeedAvailable(data: Speed) {
+        val speedStatus = carValueStatus(data.displaySpeedMetersPerSecond.status)
+        Log.d(TAG, "Received speed: $data")
+
+        if (isEnabled(latestContext, carSpeed)) {
+            onSensorUpdated(
+                latestContext,
+                carSpeed.sensor,
+                if (speedStatus == "success") data.displaySpeedMetersPerSecond.value!! else STATE_UNKNOWN,
+                carSpeed.sensor.statelessIcon,
+                mapOf(
+                    "status" to speedStatus
                 ),
                 forceUpdate = true
             )
