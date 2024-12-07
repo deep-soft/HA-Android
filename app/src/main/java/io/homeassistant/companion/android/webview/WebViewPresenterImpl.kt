@@ -18,6 +18,7 @@ import io.homeassistant.companion.android.matter.MatterManager
 import io.homeassistant.companion.android.thread.ThreadManager
 import io.homeassistant.companion.android.util.UrlUtil
 import io.homeassistant.companion.android.util.UrlUtil.baseIsEqual
+import io.homeassistant.companion.android.webview.externalbus.ExternalBusMessage
 import io.homeassistant.companion.android.webview.externalbus.ExternalBusRepository
 import java.net.SocketTimeoutException
 import java.net.URL
@@ -480,6 +481,14 @@ class WebViewPresenterImpl @Inject constructor(
         mutableMatterThreadStep.tryEmit(MatterThreadStep.NOT_STARTED)
     }
 
+    override suspend fun shouldShowImprovPermissions(): Boolean {
+        return if (improvRepository.hasPermission(view as Context)) {
+            false
+        } else {
+            prefsRepository.getImprovPermissionDisplayedCount() < 2
+        }
+    }
+
     override fun startScanningForImprov(): Boolean {
         if (!improvRepository.hasPermission(view as Context)) return false
         improvJobStarted = System.currentTimeMillis()
@@ -488,13 +497,23 @@ class WebViewPresenterImpl @Inject constructor(
                 improvRepository.startScanning(view as Context)
             }
             improvRepository.getDevices().collect {
-                if (it.any()) view.showImprovAvailable()
+                it.forEach { device ->
+                    val name = device.name ?: return@forEach
+                    externalBusRepository.send(
+                        ExternalBusMessage(
+                            id = -1,
+                            type = "command",
+                            command = "improv/discovered_device",
+                            payload = mapOf(
+                                "name" to name
+                            )
+                        )
+                    )
+                }
             }
         }
         return true
     }
-
-    override fun getImprovPermissions(): Array<String> = improvRepository.getRequiredPermissions()
 
     override fun stopScanningForImprov(force: Boolean) {
         if (improvJob?.isActive == true && (force || System.currentTimeMillis() - improvJobStarted > 1000)) {

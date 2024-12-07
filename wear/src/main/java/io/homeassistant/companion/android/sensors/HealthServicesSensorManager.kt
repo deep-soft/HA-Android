@@ -51,6 +51,7 @@ class HealthServicesSensorManager : SensorManager {
             "mdi:stairs",
             unitOfMeasurement = "floors",
             entityCategory = SensorManager.ENTITY_CATEGORY_DIAGNOSTIC,
+            stateClass = SensorManager.STATE_CLASS_TOTAL_INCREASING,
             updateType = SensorManager.BasicSensor.UpdateType.WORKER
         )
         private val dailyDistance = SensorManager.BasicSensor(
@@ -62,6 +63,7 @@ class HealthServicesSensorManager : SensorManager {
             "distance",
             unitOfMeasurement = "m",
             entityCategory = SensorManager.ENTITY_CATEGORY_DIAGNOSTIC,
+            stateClass = SensorManager.STATE_CLASS_TOTAL_INCREASING,
             updateType = SensorManager.BasicSensor.UpdateType.WORKER
         )
         private val dailyCalories = SensorManager.BasicSensor(
@@ -73,6 +75,7 @@ class HealthServicesSensorManager : SensorManager {
             "energy",
             unitOfMeasurement = "cal",
             entityCategory = SensorManager.ENTITY_CATEGORY_DIAGNOSTIC,
+            stateClass = SensorManager.STATE_CLASS_TOTAL_INCREASING,
             updateType = SensorManager.BasicSensor.UpdateType.WORKER
         )
         private val dailySteps = SensorManager.BasicSensor(
@@ -83,6 +86,7 @@ class HealthServicesSensorManager : SensorManager {
             "mdi:shoe-print",
             unitOfMeasurement = "steps",
             entityCategory = SensorManager.ENTITY_CATEGORY_DIAGNOSTIC,
+            stateClass = SensorManager.STATE_CLASS_TOTAL_INCREASING,
             updateType = SensorManager.BasicSensor.UpdateType.WORKER
         )
     }
@@ -141,12 +145,12 @@ class HealthServicesSensorManager : SensorManager {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
     }
 
-    override fun requestSensorUpdate(context: Context) {
+    override suspend fun requestSensorUpdate(context: Context) {
         latestContext = context
         updateHealthServices()
     }
 
-    private fun updateHealthServices() {
+    private suspend fun updateHealthServices() {
         val activityStateEnabled = isEnabled(latestContext, userActivityState)
         val dailyFloorEnabled = isEnabled(latestContext, dailyFloors)
         val dailyDistanceEnabled = isEnabled(latestContext, dailyDistance)

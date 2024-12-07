@@ -3,7 +3,6 @@ package io.homeassistant.companion.android.settings.sensor.views
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
@@ -94,14 +93,14 @@ fun SensorDetailView(
     val context = LocalContext.current
     var sensorUpdateTypeInfo by remember { mutableStateOf(false) }
     val jsonMapper by lazy { jacksonObjectMapper() }
-    val healthConnectPermission = HealthConnectSensorManager.getPermissionResultContract(context)?.let {
-        rememberLauncherForActivityResult(it) { }
-    }
 
-    val sensorEnabled = viewModel.sensor?.sensor?.enabled
-        ?: (
-            viewModel.basicSensor != null && viewModel.basicSensor.enabledByDefault && viewModel.sensorManager?.checkPermission(context, viewModel.basicSensor.id) == true
-            )
+    var sensorEnabled by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        sensorEnabled = viewModel.sensor?.sensor?.enabled
+            ?: (
+                viewModel.basicSensor != null && viewModel.basicSensor.enabledByDefault && viewModel.sensorManager?.checkPermission(context, viewModel.basicSensor.id) == true
+                )
+    }
 
     val scaffoldState = rememberScaffoldState()
     LaunchedEffect("snackbar") {
@@ -113,7 +112,9 @@ fun SensorDetailView(
                 if (result == SnackbarResult.ActionPerformed) {
                     if (it.actionOpensSettings) {
                         if (viewModel.sensorId.startsWith("health_connect")) {
-                            healthConnectPermission?.launch(HealthConnectSensorManager().requiredPermissions(viewModel.sensorId).toSet())
+                            HealthConnectSensorManager.getPermissionIntent()?.let { intent ->
+                                context.startActivity(intent)
+                            }
                         } else {
                             context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
                         }
@@ -166,6 +167,7 @@ fun SensorDetailView(
                         text = stringResource(
                             when (viewModel.basicSensor.updateType) {
                                 SensorManager.BasicSensor.UpdateType.INTENT -> commonR.string.sensor_update_type_chip_intent
+                                SensorManager.BasicSensor.UpdateType.INTENT_ONLY -> commonR.string.sensor_update_type_chip_intent_only
                                 SensorManager.BasicSensor.UpdateType.WORKER -> {
                                     when (viewModel.settingUpdateFrequency) {
                                         SensorUpdateFrequencySetting.FAST_ALWAYS -> commonR.string.sensor_update_type_chip_worker_fast_always
@@ -577,6 +579,9 @@ fun SensorDetailUpdateInfoDialog(
         content = {
             var infoString = when (basicSensor.updateType) {
                 SensorManager.BasicSensor.UpdateType.INTENT -> stringResource(commonR.string.sensor_update_type_info_intent)
+                SensorManager.BasicSensor.UpdateType.INTENT_ONLY -> {
+                    "${stringResource(commonR.string.sensor_update_type_info_intent)}\n\n${stringResource(commonR.string.sensor_update_type_info_intent_only)}"
+                }
                 SensorManager.BasicSensor.UpdateType.WORKER -> {
                     "${stringResource(
                         when (userSetting) {

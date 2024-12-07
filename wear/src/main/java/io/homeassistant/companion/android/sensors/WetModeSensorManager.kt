@@ -15,8 +15,7 @@ class WetModeSensorManager : SensorManager {
             commonR.string.sensor_description_wet_mode,
             "mdi:water-off",
             entityCategory = SensorManager.ENTITY_CATEGORY_DIAGNOSTIC,
-            updateType = SensorManager.BasicSensor.UpdateType.INTENT
-
+            updateType = SensorManager.BasicSensor.UpdateType.INTENT_ONLY
         )
     }
 
@@ -39,7 +38,7 @@ class WetModeSensorManager : SensorManager {
         return emptyArray()
     }
 
-    override fun requestSensorUpdate(
+    override suspend fun requestSensorUpdate(
         context: Context,
         intent: Intent?
     ) {
@@ -52,11 +51,11 @@ class WetModeSensorManager : SensorManager {
         updateWetMode(context)
     }
 
-    override fun requestSensorUpdate(context: Context) {
+    override suspend fun requestSensorUpdate(context: Context) {
         // No Op
     }
 
-    private fun updateWetMode(context: Context) {
+    private suspend fun updateWetMode(context: Context) {
         if (!isEnabled(context, wetModeSensor)) {
             return
         }

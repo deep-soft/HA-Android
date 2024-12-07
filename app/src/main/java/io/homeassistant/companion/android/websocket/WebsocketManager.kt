@@ -186,7 +186,8 @@ class WebsocketManager(
                             if (action is Map<*, *>) {
                                 flattened["action_${i + 1}_key"] = action["action"].toString()
                                 flattened["action_${i + 1}_title"] = action["title"].toString()
-                                flattened["action_${i + 1}_uri"] = action["uri"].toString()
+                                action["uri"]?.let { uri -> flattened["action_${i + 1}_uri"] = uri.toString() }
+                                action["behavior"]?.let { behavior -> flattened["action_${i + 1}_behavior"] = behavior.toString() }
                             }
                         }
                     } else {
@@ -214,16 +215,12 @@ class WebsocketManager(
      */
     private suspend fun createNotification(): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            var notificationChannel =
-                notificationManager.getNotificationChannel(CHANNEL_WEBSOCKET)
-            if (notificationChannel == null) {
-                notificationChannel = NotificationChannel(
-                    CHANNEL_WEBSOCKET,
-                    applicationContext.getString(R.string.websocket_setting_name),
-                    NotificationManager.IMPORTANCE_LOW
-                )
-                notificationManager.createNotificationChannel(notificationChannel)
-            }
+            val notificationChannel = NotificationChannel(
+                CHANNEL_WEBSOCKET,
+                applicationContext.getString(R.string.websocket_setting_name),
+                NotificationManager.IMPORTANCE_LOW
+            )
+            notificationManager.createNotificationChannel(notificationChannel)
         }
 
         val intent = WebViewActivity.newInstance(applicationContext)

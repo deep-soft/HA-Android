@@ -4,8 +4,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.WindowManager
-import android.widget.FrameLayout
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.platform.ComposeView
 import androidx.core.os.bundleOf
@@ -13,14 +11,15 @@ import androidx.fragment.app.setFragmentResult
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import com.google.android.material.R
-import com.google.android.material.bottomsheet.BottomSheetBehavior
-import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import com.wifi.improv.DeviceState
 import dagger.hilt.android.AndroidEntryPoint
 import io.homeassistant.companion.android.common.data.wifi.WifiHelper
 import io.homeassistant.companion.android.improv.ImprovRepository
 import io.homeassistant.companion.android.util.compose.HomeAssistantAppTheme
+import io.homeassistant.companion.android.util.setLayoutAndExpandedByDefault
+import io.homeassistant.companion.android.webview.externalbus.ExternalBusMessage
+import io.homeassistant.companion.android.webview.externalbus.ExternalBusRepository
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,13 +33,24 @@ class ImprovSetupDialog : BottomSheetDialogFragment() {
     lateinit var improvRepository: ImprovRepository
 
     @Inject
+    lateinit var externalBusRepository: ExternalBusRepository
+
+    @Inject
     lateinit var wifiHelper: WifiHelper
 
     companion object {
         const val TAG = "ImprovSetupDialog"
 
+        private const val ARG_NAME = "name"
+
         const val RESULT_KEY = "ImprovSetupResult"
         const val RESULT_DOMAIN = "domain"
+
+        fun newInstance(deviceName: String?): ImprovSetupDialog {
+            return ImprovSetupDialog().apply {
+                arguments = bundleOf(ARG_NAME to deviceName)
+            }
+        }
     }
 
     private val screenState = MutableStateFlow(
@@ -52,9 +62,20 @@ class ImprovSetupDialog : BottomSheetDialogFragment() {
         )
     )
 
+    private var initialDeviceName: String? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         lifecycleScope.launch {
+            if (savedInstanceState == null) {
+                if (arguments?.containsKey(ARG_NAME) == true) {
+                    val name = arguments?.getString(ARG_NAME, "").takeIf { !it.isNullOrBlank() }
+                    name?.let {
+                        initialDeviceName = it
+                        screenState.emit(screenState.value.copy(initialDeviceName = it))
+                    }
+                }
+            }
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 screenState.emit(screenState.value.copy(activeSsid = wifiHelper.getWifiSsid()?.removeSurrounding("\"")))
                 launch {
@@ -65,11 +86,23 @@ class ImprovSetupDialog : BottomSheetDialogFragment() {
                 launch {
                     improvRepository.getDevices().collect {
                         screenState.emit(screenState.value.copy(devices = it))
+                        if (initialDeviceName != null) {
+                            it.firstOrNull { device -> device.name == initialDeviceName }
+                                ?.let { foundDevice ->
+                                    screenState.emit(
+                                        screenState.value.copy(
+                                            initialDeviceAddress = foundDevice.address
+                                        )
+                                    )
+                                    initialDeviceName = null
+                                }
+                        }
                     }
                 }
                 launch {
                     improvRepository.getDeviceState().collect {
                         screenState.emit(screenState.value.copy(deviceState = it))
+                        if (it == DeviceState.PROVISIONED) notifyFrontend()
                     }
                 }
                 launch {
@@ -111,14 +144,7 @@ class ImprovSetupDialog : BottomSheetDialogFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        dialog?.setOnShowListener {
-            val dialog = it as BottomSheetDialog
-            dialog.window?.setDimAmount(0.03f)
-            dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-            val bottomSheet = dialog.findViewById<View>(R.id.design_bottom_sheet) as FrameLayout
-            val bottomSheetBehavior = BottomSheetBehavior.from(bottomSheet)
-            bottomSheetBehavior.state = BottomSheetBehavior.STATE_EXPANDED
-        }
+        setLayoutAndExpandedByDefault()
     }
 
     override fun onResume() {
@@ -136,6 +162,18 @@ class ImprovSetupDialog : BottomSheetDialogFragment() {
             lifecycleScope.launch(Dispatchers.IO) {
                 improvRepository.startScanning(it)
             }
+        }
+    }
+
+    private fun notifyFrontend() {
+        lifecycleScope.launch {
+            externalBusRepository.send(
+                ExternalBusMessage(
+                    id = -1,
+                    type = "command",
+                    command = "improv/device_setup_done"
+                )
+            )
         }
     }
 }

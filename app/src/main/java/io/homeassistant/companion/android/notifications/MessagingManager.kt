@@ -78,6 +78,8 @@ import io.homeassistant.companion.android.sensors.LocationSensorManager
 import io.homeassistant.companion.android.sensors.NotificationSensorManager
 import io.homeassistant.companion.android.sensors.SensorReceiver
 import io.homeassistant.companion.android.settings.SettingsActivity
+import io.homeassistant.companion.android.util.FlashlightHelper
+import io.homeassistant.companion.android.util.PermissionRequestMediator
 import io.homeassistant.companion.android.util.UrlUtil
 import io.homeassistant.companion.android.vehicle.HaCarAppService
 import io.homeassistant.companion.android.websocket.WebsocketManager
@@ -111,7 +113,9 @@ class MessagingManager @Inject constructor(
     private val notificationDao: NotificationDao,
     private val sensorDao: SensorDao,
     private val settingsDao: SettingsDao,
-    private val textToSpeechClient: TextToSpeechClient
+    private val textToSpeechClient: TextToSpeechClient,
+    private val flashlightHelper: FlashlightHelper,
+    private val permissionRequestMediator: PermissionRequestMediator
 ) {
     companion object {
         const val TAG = "MessagingService"
@@ -134,11 +138,15 @@ class MessagingManager @Inject constructor(
         const val CHRONOMETER = "chronometer"
         const val WHEN = "when"
         const val WHEN_RELATIVE = "when_relative"
+        const val PROGRESS = "progress"
+        const val PROGRESS_MAX = "progress_max"
+        const val PROGRESS_INDETERMINATE = "progress_indeterminate"
         const val CAR_UI = "car_ui"
         const val KEY_TEXT_REPLY = "key_text_reply"
         const val INTENT_CLASS_NAME = "intent_class_name"
         const val URI = "URI"
         const val REPLY = "REPLY"
+        const val TEXT_INPUT = "textinput"
         const val HIGH_ACCURACY_UPDATE_INTERVAL = "high_accuracy_update_interval"
         const val PACKAGE_NAME = "package_name"
         const val CONFIRMATION = "confirmation"
@@ -170,6 +178,7 @@ class MessagingManager @Inject constructor(
         const val COMMAND_AUTO_SCREEN_BRIGHTNESS = "command_auto_screen_brightness"
         const val COMMAND_SCREEN_BRIGHTNESS_LEVEL = "command_screen_brightness_level"
         const val COMMAND_SCREEN_OFF_TIMEOUT = "command_screen_off_timeout"
+        const val COMMAND_FLASHLIGHT = "command_flashlight"
 
         // DND commands
         const val DND_PRIORITY_ONLY = "priority_only"
@@ -224,7 +233,8 @@ class MessagingManager @Inject constructor(
             COMMAND_PERSISTENT_CONNECTION,
             COMMAND_AUTO_SCREEN_BRIGHTNESS,
             COMMAND_SCREEN_BRIGHTNESS_LEVEL,
-            COMMAND_SCREEN_OFF_TIMEOUT
+            COMMAND_SCREEN_OFF_TIMEOUT,
+            COMMAND_FLASHLIGHT
         )
         val DND_COMMANDS = listOf(DND_ALARMS_ONLY, DND_ALL, DND_NONE, DND_PRIORITY_ONLY)
         val RM_COMMANDS = listOf(RM_NORMAL, RM_SILENT, RM_VIBRATE)
@@ -532,6 +542,15 @@ class MessagingManager @Inject constructor(
                                 sendNotification(jsonData)
                             }
                         }
+                        COMMAND_FLASHLIGHT -> {
+                            val command = jsonData[NotificationData.COMMAND]
+                            if (command in DeviceCommandData.ENABLE_COMMANDS && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                handleDeviceCommands(jsonData)
+                            } else {
+                                Log.d(TAG, "Invalid flashlight command received, posting notification to device")
+                                sendNotification(jsonData)
+                            }
+                        }
                         else -> Log.d(TAG, "No command received")
                     }
                 }
@@ -775,6 +794,19 @@ class MessagingManager @Inject constructor(
                     mainScope.launch { sendNotification(data) }
                 }
             }
+            COMMAND_FLASHLIGHT -> {
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                    when (command) {
+                        DeviceCommandData.TURN_OFF -> flashlightHelper.turnOffFlashlight()
+                        DeviceCommandData.TURN_ON -> flashlightHelper.turnOnFlashlight()
+                    }
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    Handler(Looper.getMainLooper()).post {
+                        Toast.makeText(context, commonR.string.missing_camera_permission, Toast.LENGTH_LONG).show()
+                    }
+                    requestCameraPermission()
+                }
+            }
             else -> Log.d(TAG, "No command received")
         }
     }
@@ -948,6 +980,8 @@ class MessagingManager @Inject constructor(
 
         handleChronometer(notificationBuilder, data)
 
+        handleProgress(notificationBuilder, data)
+
         val useCarNotification = handleCarUiVisible(context, notificationBuilder, data)
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
@@ -1006,6 +1040,23 @@ class MessagingManager @Inject constructor(
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error while handling chronometer notification", e)
+        }
+    }
+
+    private fun handleProgress(
+        builder: NotificationCompat.Builder,
+        data: Map<String, String>
+    ) {
+        try { // Without this, a non-numeric when value will crash the app
+            val progress = data[PROGRESS]?.toIntOrNull() ?: -1
+            val progressMax = data[PROGRESS_MAX]?.toIntOrNull() ?: 1
+            val progressIndeterminate = data[PROGRESS_INDETERMINATE]?.toBoolean() ?: false
+
+            if (progress != -1) {
+                builder.setProgress(progressMax, progress, progressIndeterminate)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error while handling progress notification", e)
         }
     }
 
@@ -1432,6 +1483,7 @@ class MessagingManager @Inject constructor(
                     data["action_${i}_key"].toString(),
                     data["action_${i}_title"].toString(),
                     data["action_${i}_uri"],
+                    data["action_${i}_behavior"],
                     data
                 )
                 val eventIntent = Intent(context, NotificationActionReceiver::class.java).apply {
@@ -1450,8 +1502,8 @@ class MessagingManager @Inject constructor(
                     )
                 }
 
-                when (notificationAction.key) {
-                    URI -> {
+                when {
+                    notificationAction.key == URI -> {
                         if (!notificationAction.uri.isNullOrBlank()) {
                             builder.addAction(
                                 commonR.drawable.ic_globe,
@@ -1460,7 +1512,7 @@ class MessagingManager @Inject constructor(
                             )
                         }
                     }
-                    REPLY -> {
+                    notificationAction.key == REPLY || notificationAction.behavior?.lowercase() == TEXT_INPUT -> {
                         val remoteInput: RemoteInput = RemoteInput.Builder(KEY_TEXT_REPLY).run {
                             setLabel(context.getString(commonR.string.action_reply))
                             build()
@@ -1633,6 +1685,14 @@ class MessagingManager @Inject constructor(
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
         context.startActivity(intent)
     }
+
+    @RequiresApi(Build.VERSION_CODES.M)
+    private fun requestRuntimePermission(permission: String) {
+        permissionRequestMediator.emitPermissionRequestEvent(permission)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.M)
+    private fun requestCameraPermission() = requestRuntimePermission(Manifest.permission.CAMERA)
 
     private fun getKeyEvent(key: String): Int {
         return when (key) {
