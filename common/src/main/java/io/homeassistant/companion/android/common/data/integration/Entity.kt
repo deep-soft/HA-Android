@@ -42,6 +42,7 @@ object EntityExt {
     const val LIGHT_SUPPORT_BRIGHTNESS_DEPR = 1
     const val LIGHT_SUPPORT_COLOR_TEMP_DEPR = 2
     const val ALARM_CONTROL_PANEL_SUPPORT_ARM_AWAY = 2
+    const val MEDIA_PLAYER_SUPPORT_VOLUME_SET = 4
 
     val DOMAINS_PRESS = listOf("button", "input_button")
     val DOMAINS_TOGGLE = listOf(
@@ -298,6 +299,50 @@ fun <T> Entity<T>.getLightColor(): Int? {
     }
 }
 
+fun <T> Entity<T>.supportsVolumeSet(): Boolean {
+    return try {
+        if (domain != "media_player") return false
+        ((attributes as Map<*, *>)["supported_features"] as Int) and EntityExt.MEDIA_PLAYER_SUPPORT_VOLUME_SET == EntityExt.MEDIA_PLAYER_SUPPORT_VOLUME_SET
+    } catch (e: Exception) {
+        Log.e(EntityExt.TAG, "Unable to get supportsVolumeSet", e)
+        false
+    }
+}
+
+fun <T> Entity<T>.getVolumeLevel(): EntityPosition? {
+    return try {
+        if (!supportsVolumeSet()) return null
+
+        val minValue = 0f
+        val maxValue = 100f
+
+        // Convert to percentage to match frontend behavior:
+        // https://github.com/home-assistant/frontend/blob/dev/src/dialogs/more-info/controls/more-info-media_player.ts#L137
+        val currentValue = ((attributes as Map<*, *>)["volume_level"] as? Number)?.toFloat()?.times(100) ?: 0f
+
+        EntityPosition(
+            value = currentValue.coerceAtLeast(minValue).coerceAtMost(maxValue),
+            min = minValue,
+            max = maxValue
+        )
+    } catch (e: Exception) {
+        Log.e(EntityExt.TAG, "Unable to get getVolumeLevel", e)
+        null
+    }
+}
+
+fun <T> Entity<T>.getVolumeStep(): Float {
+    return try {
+        if (!supportsVolumeSet()) return 0.1f
+
+        val volumeStep = ((attributes as Map<*, *>)["volume_step"] as? Number)?.toFloat() ?: 0.1f
+        volumeStep.coerceAtLeast(0.01f)
+    } catch (e: Exception) {
+        Log.e(EntityExt.TAG, "Unable to get getVolumeStep", e)
+        0.1f
+    }
+}
+
 fun <T> Entity<T>.getIcon(context: Context): IIcon {
     val attributes = this.attributes as Map<String, Any?>
     val icon = attributes["icon"] as? String
@@ -416,7 +461,49 @@ fun <T> Entity<T>.getIcon(context: Context): IIcon {
                 }
             }
             "notify" -> CommunityMaterial.Icon3.cmd_message
-            "number" -> CommunityMaterial.Icon3.cmd_ray_vertex
+            "number" -> when (attributes["device_class"]) {
+                "apparent_power", "power", "reactive_power" -> CommunityMaterial.Icon2.cmd_flash
+                "aqi" -> CommunityMaterial.Icon.cmd_air_filter
+                "area" -> CommunityMaterial.Icon3.cmd_texture_box
+                "atmospheric_pressure" -> CommunityMaterial.Icon3.cmd_thermometer_lines
+                "battery" -> CommunityMaterial.Icon.cmd_battery
+                "blood_glucose_concentration" -> CommunityMaterial.Icon3.cmd_spoon_sugar
+                "carbon_dioxide" -> CommunityMaterial.Icon3.cmd_molecule_co2
+                "carbon_monoxide" -> CommunityMaterial.Icon3.cmd_molecule_co
+                "conductivity" -> CommunityMaterial.Icon3.cmd_sprout_outline
+                "current" -> CommunityMaterial.Icon.cmd_current_ac
+                "data_rate" -> CommunityMaterial.Icon3.cmd_transmission_tower
+                "data_size" -> CommunityMaterial.Icon.cmd_database
+                "distance" -> CommunityMaterial.Icon.cmd_arrow_left_right
+                "duration" -> CommunityMaterial.Icon3.cmd_progress_clock
+                "energy" -> CommunityMaterial.Icon2.cmd_lightning_bolt
+                "energy_storage" -> CommunityMaterial.Icon.cmd_car_battery
+                "frequency", "voltage" -> CommunityMaterial.Icon3.cmd_sine_wave
+                "gas" -> CommunityMaterial.Icon3.cmd_meter_gas
+                "humidity" -> CommunityMaterial.Icon3.cmd_water_percent
+                "illuminance" -> CommunityMaterial.Icon.cmd_brightness_5
+                "irradiance" -> CommunityMaterial.Icon3.cmd_sun_wireless
+                "moisture" -> CommunityMaterial.Icon3.cmd_water_percent
+                "monetary" -> CommunityMaterial.Icon.cmd_cash
+                "nitrogen_dioxide", "nitrogen_monoxide", "nitrogen_oxide", "ozone",
+                "pm1", "pm10", "pm25", "sulfur_dioxide", "volatile_organic_compounds",
+                "volatile_organic_compounds_parts" -> CommunityMaterial.Icon3.cmd_molecule
+                "ph" -> CommunityMaterial.Icon3.cmd_ph
+                "power_factor" -> CommunityMaterial.Icon.cmd_angle_acute
+                "precipitation" -> CommunityMaterial.Icon3.cmd_weather_rainy
+                "precipitation_intensity" -> CommunityMaterial.Icon3.cmd_weather_pouring
+                "pressure" -> CommunityMaterial.Icon2.cmd_gauge
+                "signal_strength" -> CommunityMaterial.Icon3.cmd_wifi
+                "sound_pressure" -> CommunityMaterial.Icon.cmd_ear_hearing
+                "speed" -> CommunityMaterial.Icon3.cmd_speedometer
+                "temperature" -> CommunityMaterial.Icon3.cmd_thermometer
+                "volume" -> CommunityMaterial.Icon.cmd_car_coolant_level
+                "volume_storage" -> CommunityMaterial.Icon3.cmd_storage_tank
+                "water" -> CommunityMaterial.Icon3.cmd_water
+                "weight" -> CommunityMaterial.Icon3.cmd_weight
+                "wind_speed" -> CommunityMaterial.Icon3.cmd_weather_windy
+                else -> CommunityMaterial.Icon3.cmd_ray_vertex
+            }
             "persistent_notification" -> CommunityMaterial.Icon.cmd_bell
             "person" -> if (compareState == "not_home") {
                 CommunityMaterial.Icon.cmd_account_arrow_right
@@ -425,7 +512,11 @@ fun <T> Entity<T>.getIcon(context: Context): IIcon {
             }
             "plant" -> CommunityMaterial.Icon2.cmd_flower
             "proximity" -> CommunityMaterial.Icon.cmd_apple_safari
-            "remote" -> CommunityMaterial.Icon3.cmd_remote
+            "remote" -> if (compareState == "on") {
+                CommunityMaterial.Icon3.cmd_remote
+            } else {
+                CommunityMaterial.Icon3.cmd_remote_off
+            }
             "scene" -> CommunityMaterial.Icon3.cmd_palette_outline // Different from frontend: outline version
             "schedule" -> CommunityMaterial.Icon.cmd_calendar_clock
             "script" -> CommunityMaterial.Icon3.cmd_script_text_outline // Different from frontend: outline version

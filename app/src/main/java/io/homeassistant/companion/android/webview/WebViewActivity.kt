@@ -934,7 +934,7 @@ class WebViewActivity : BaseActivity(), io.homeassistant.companion.android.webvi
         val settingsWithLocationPermissions = mutableListOf<String>()
         if (!DisabledLocationHandler.isLocationEnabled(this) && presenter.isSsidUsed()) {
             showLocationDisabledWarning = true
-            settingsWithLocationPermissions.add(getString(commonR.string.pref_connection_wifi))
+            settingsWithLocationPermissions.add(getString(commonR.string.pref_connection_homenetwork))
         }
         for (manager in SensorReceiver.MANAGERS) {
             for (basicSensor in manager.getAvailableSensors(this)) {
@@ -1677,8 +1677,14 @@ class WebViewActivity : BaseActivity(), io.homeassistant.companion.android.webvi
     }
 
     private fun scanForImprov() {
-        if (!packageManager.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) return
-        if (!hasWindowFocus()) return
+        if (!packageManager.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
+            Log.d(TAG, "Improv scan request ignored because device doesn't have Bluetooth")
+            return
+        }
+        if (!hasWindowFocus()) {
+            Log.d(TAG, "Improv scan request ignored because webview doesn't have focus")
+            return
+        }
         lifecycleScope.launch {
             if (presenter.shouldShowImprovPermissions()) {
                 supportFragmentManager.setFragmentResultListener(ImprovPermissionDialog.RESULT_KEY, this@WebViewActivity) { _, bundle ->

@@ -1,6 +1,6 @@
 [versions]
 activity-compose = "1.9.3"
-androidBeaconLibrary = "2.20.6"
+androidBeaconLibrary = "2.20.7"
 androidPlugin = "8.7.3"
 androidSdk-compile = "35"
 androidSdk-min = "21"
@@ -12,9 +12,9 @@ appcompat = "1.7.0"
 biometric = "1.1.0"
 blurView = "version-2.0.5"
 car-versions = "1.4.0"
-changeLog = "3.5"
+changeLog = "3.7.1"
 community-material-typeface = "7.0.96.1-kotlin"
-compose-bom = "2024.11.00"
+compose-bom = "2024.12.01"
 connectClient = "1.1.0-alpha10"
 constraintlayout = "2.2.0"
 coreKtx = "1.15.0"
@@ -25,9 +25,9 @@ firebase-bom = "33.7.0"
 firebaseAppdistributionGradle = "5.0.0"
 fragment-ktx = "1.8.5"
 googleServices = "4.4.2"
-guava = "33.3.1-android"
+guava = "33.4.0-android"
 healthServicesClient = "1.1.0-alpha04"
-hilt = "2.53"
+hilt = "2.54"
 iconics = "5.4.0"
 improv = "0.1.1"
 jackson-module-kotlin = "2.13.5"
@@ -39,11 +39,11 @@ ktlint = "12.1.2"
 lifecycle = "2.8.7"
 material = "1.12.0"
 media = "1.7.0"
-media3 = "1.5.0"
-navigation-compose = "2.8.4"
+media3 = "1.5.1"
+navigation-compose = "2.8.5"
 okhttp = "5.0.0-alpha.14"
-paging = "3.3.4"
-picasso = "2.8"
+paging = "3.3.5"
+coil = "3.0.4"
 play-services-threadnetwork = "16.2.1"
 play-services-home = "16.0.0"
 play-services-location = "21.3.0"
@@ -53,19 +53,19 @@ recyclerview = "1.3.2"
 reorderable = "0.9.6"
 retrofit = "2.9.0"
 room = "2.6.1"
-sentry-android = "7.18.1"
-tools-desugar-jdk-libs = "2.1.3"
+sentry-android = "7.19.1"
+tools-desugar-jdk-libs = "2.1.4"
 watchfaceComplicationsDataSourceKtx = "1.2.1"
 wear = "1.3.0"
 wear-compose-foundation = "1.4.0"
-wear-compose-material = "1.0.0-alpha29"
+wear-compose-material = "1.0.0-alpha30"
 wear-protolayout = "1.2.1"
 wear-tiles = "1.4.1"
 wear-tooling = "1.0.0"
 wearPhoneInteractions = "1.0.1"
 wearInput = "1.2.0-alpha02"
 webkit = "1.12.1"
-wear-remote-interactions = "1.0.0"
+wear-remote-interactions = "1.1.0"
 workRuntimeKtx = "2.10.0"
 zxing = "4.3.0"
 
@@ -104,6 +104,9 @@ car-core = { module = "androidx.car.app:app", version.ref = "car-versions" }
 car-automotive = { module = "androidx.car.app:app-automotive", version.ref = "car-versions" }
 car-projected = { module = "androidx.car.app:app-projected", version.ref = "car-versions" }
 changeLog = { module = "com.github.AppDevNext:ChangeLog", version.ref = "changeLog" }
+coil-oktthp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
+coil-svg = { module = "io.coil-kt.coil3:coil-svg", version.ref = "coil" }
+coil-views = { module = "io.coil-kt.coil3:coil", version.ref = "coil" }
 community-material-typeface = { module = "com.mikepenz:community-material-typeface", version.ref = "community-material-typeface" }
 compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
 compose-animation = { module = "androidx.compose.animation:animation" }
@@ -148,7 +151,6 @@ paging-compose = { module = "androidx.paging:paging-compose", version.ref = "pag
 play-services-threadnetwork = { module = "com.google.android.gms:play-services-threadnetwork", version.ref = "play-services-threadnetwork" }
 play-services-home = { module = "com.google.android.gms:play-services-home", version.ref = "play-services-home" }
 play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "play-services-location" }
-picasso = { module = "com.squareup.picasso:picasso", version.ref = "picasso" }
 play-services-wearable = { module = "com.google.android.gms:play-services-wearable", version.ref = "play-services-wearable" }
 preference-ktx = { module = "androidx.preference:preference-ktx", version.ref = "preference-ktx" }
 recyclerview = { module = "androidx.recyclerview:recyclerview", version.ref = "recyclerview" }
@@ -173,6 +175,7 @@ webkit = { module = "androidx.webkit:webkit", version.ref = "webkit" }
 zxing = { module = "com.journeyapps:zxing-android-embedded", version.ref = "zxing" }
 
 [bundles]
+coil = ["coil-views", "coil-oktthp", "coil-svg"]
 media3 = ["media3-exoplayer", "media3-exoplayer-hls", "media3-ui"]
 paging = ["paging-runtime", "paging-compose"]
 wear-tiles = ["wear-tiles", "wear-protolayout-main", "wear-protolayout-expression", "wear-protolayout-material"]

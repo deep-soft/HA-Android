@@ -28,6 +28,10 @@ data class ServerConnectionInfo(
     val useCloud: Boolean = false,
     @ColumnInfo(name = "internal_ssids")
     val internalSsids: List<String> = emptyList(),
+    @ColumnInfo(name = "internal_ethernet")
+    val internalEthernet: Boolean? = null,
+    @ColumnInfo(name = "internal_vpn")
+    val internalVpn: Boolean? = null,
     @ColumnInfo(name = "prioritize_internal")
     val prioritizeInternal: Boolean = false
 ) {
@@ -91,14 +95,35 @@ data class ServerConnectionInfo(
 
     fun canUseCloud(): Boolean = !this.cloudUrl.isNullOrBlank()
 
-    fun isHomeWifiSsid(): Boolean = wifiHelper.isUsingSpecificWifi(internalSsids)
+    /**
+     * Indicate if the device's current connection should be treated as internal for
+     * this server.
+     * @param requiresUrl Whether a valid internal url is required for internal or not.
+     *   Usually you want this `true` for url related actions and `false` for others.
+     */
+    fun isInternal(requiresUrl: Boolean = true): Boolean {
+        if (requiresUrl && internalUrl.isNullOrBlank()) return false
 
-    fun isInternal(): Boolean {
-        val usesInternalSsid = wifiHelper.isUsingSpecificWifi(internalSsids)
-        val usesWifi = wifiHelper.isUsingWifi()
-        val localUrl = internalUrl
-        Log.d(this::class.simpleName, "localUrl is: ${!localUrl.isNullOrBlank()}, usesInternalSsid is: $usesInternalSsid, usesWifi is: $usesWifi")
-        return !localUrl.isNullOrBlank() && usesInternalSsid && usesWifi
+        if (internalEthernet == true) {
+            val usesEthernet = wifiHelper.isUsingEthernet()
+            Log.d(this::class.simpleName, "usesEthernet is: $usesEthernet")
+            if (usesEthernet) return true
+        }
+
+        if (internalVpn == true) {
+            val usesVpn = wifiHelper.isUsingVpn()
+            Log.d(this::class.simpleName, "usesVpn is: $usesVpn")
+            if (usesVpn) return true
+        }
+
+        return if (internalSsids.isNotEmpty()) {
+            val usesInternalSsid = wifiHelper.isUsingSpecificWifi(internalSsids)
+            val usesWifi = wifiHelper.isUsingWifi()
+            Log.d(this::class.simpleName, "usesInternalSsid is: $usesInternalSsid, usesWifi is: $usesWifi")
+            usesInternalSsid && usesWifi
+        } else {
+            false
+        }
     }
 }
 
