@@ -70,10 +70,7 @@ jobs:
           KEYSTORE_ALIAS_PASSWORD: ${{ secrets.ORIGINAL_KEYSTORE_ALIAS_PASSWORD }}
           VERSION_CODE: ${{ steps.rel_number.outputs.version-code }}
         run: |
-          ./gradlew :common:assemble
-          ./gradlew :app:assembleRelease
-          ./gradlew :wear:assembleRelease
-          ./gradlew :automotive:assembleRelease
+          ./gradlew :common:assemble :app:assembleRelease :wear:assembleRelease :automotive:assembleRelease
 
       - name: Archive Build
         uses: actions/upload-artifact@v4
@@ -91,7 +88,7 @@ jobs:
 
       - name: Create Github Pre-Release
         if: github.event.inputs.beta == 'true'
-        uses: softprops/action-gh-release@v2.1.0
+        uses: softprops/action-gh-release@v2.2.1
         with:
           tag_name: ${{ steps.rel_number.outputs.version }}
           body_path: ./app/build/outputs/changelogGithub
@@ -181,10 +178,7 @@ jobs:
           KEYSTORE_ALIAS_PASSWORD: ${{ secrets.UPLOAD_KEYSTORE_ALIAS_PASSWORD }}
           VERSION_CODE: ${{ steps.rel_number.outputs.version-code }}
         run: |
-          ./gradlew :common:assemble
-          ./gradlew :app:bundleFullRelease
-          ./gradlew :wear:bundleRelease
-          ./gradlew :automotive:bundleFullRelease
+          ./gradlew :common:assemble :app:bundleFullRelease :wear:bundleRelease :automotive:bundleFullRelease
 
       - name: Archive Build
         uses: actions/upload-artifact@v4
